@@ -4668,7 +4668,7 @@ def neighbor(ipaddr_or_hostname, verbose):
 # 'remove' subgroup ('config bgp remove ...')
 #
 
-@bgp.group(cls=clicommon.AbbreviationGroup, name='neighbor')
+@bgp.group(cls=clicommon.AbbreviationGroup, name='neighbor', context_settings=dict(max_content_width=120))
 def bgp_neighbor():
     "BGP neighbor configuration commands."
     pass

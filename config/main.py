@@ -4716,7 +4716,7 @@ def bgp_network_add(prefix):
     # Read current data from ConfigDB
     current_data = config_db.get_table(table)
 
-    # If table does not exist or is empty, initialize it
+    # Check if the network prefix already exists
     if tuple(key.split("|")) in current_data.keys():
         click.echo(f"Network {prefix} already exists in {table}.")
         return

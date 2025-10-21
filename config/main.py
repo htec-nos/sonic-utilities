@@ -122,6 +122,7 @@ VNET_NAME_MAX_LEN = 15
 GUID_MAX_LEN = 255
 
 VALID_ROUTING_CONFIG_MODES = ['separated', 'unified', 'split', 'split-unified']
+DEFAULT_ROUTING_CONFIG_MODE = 'unified'
 
 asic_type = None
 
@@ -1085,6 +1086,13 @@ def _set_routing_config_mode(config_db, mode):
     else:
         config_db.mod_entry('DEVICE_METADATA', 'localhost', {'docker_routing_config_mode': mode})
         click.echo(f"BGP configuration mode set to '{mode}' successfully.")
+
+def _get_routing_config_mode(config_db):
+    """Get routing config mode from CONFIG_DB"""
+    device_metadata = config_db.get_entry('DEVICE_METADATA', 'localhost')
+    if 'docker_routing_config_mode' in device_metadata:
+        return device_metadata['docker_routing_config_mode']
+    return DEFAULT_ROUTING_CONFIG_MODE
 
 def interface_is_in_vlan(vlan_member_table, interface_name):
     """ Check if an interface is in a vlan """
@@ -4728,12 +4736,20 @@ def bgp_config_mode():
     """
 )
 @click.argument('mode', metavar='<mode>', required=True, type=click.Choice(VALID_ROUTING_CONFIG_MODES))
-@click.pass_context
-def bgp_config_mode_set(ctx, mode):
+def bgp_config_mode_set(mode):
     """Set the BGP configuration mode."""
     config_db = ConfigDBConnector(use_unix_socket_path=True)
     config_db.connect()
     _set_routing_config_mode(config_db, mode)
+
+
+@bgp_config_mode.command('get')
+def bgp_config_mode_get():
+    """Get the BGP configuration mode."""
+    config_db = ConfigDBConnector(use_unix_socket_path=True)
+    config_db.connect()
+
+    click.echo(f"Current BGP configuration mode: {_get_routing_config_mode(config_db)}")
 
 
 #

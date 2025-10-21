@@ -117,6 +117,8 @@ DEFAULT_TPID = "0x8100"
 PORT_MODE = "switchport_mode"
 
 DOM_CONFIG_SUPPORTED_SUBPORTS = ['0', '1']
+FRR_MGMT_FRAMEWORK_CONFIG_VALUES = ["true", "false"]
+DEFAULT_FRR_MGMT_FRAMEWORK_CONFIG = "false"
 
 VNET_NAME_MAX_LEN = 15
 GUID_MAX_LEN = 255
@@ -1074,6 +1076,22 @@ def _swss_ready():
 def _is_system_starting():
     out, _ = clicommon.run_command(['sudo', 'systemctl', 'is-system-running'], return_cmd=True)
     return out.strip() == "starting"
+
+def _set_frr_mgmt_framework_config(config_db, mode):
+    """Set routing config mode in CONFIG_DB"""
+    device_metadata = config_db.get_entry('DEVICE_METADATA', 'localhost')
+    if 'frr_mgmt_framework_config' in device_metadata and device_metadata['frr_mgmt_framework_config'] == mode:
+        click.echo(f"BGP frr_mgmt_framework_config mode is already set to '{mode}'. No changes made.")
+    else:
+        config_db.mod_entry('DEVICE_METADATA', 'localhost', {'frr_mgmt_framework_config': mode})
+        click.echo(f"BGP frr_mgmt_framework_config set to '{mode}' successfully.")
+
+def _get_frr_mgmt_framework_config(config_db):
+    """Get routing config mode from CONFIG_DB"""
+    device_metadata = config_db.get_entry('DEVICE_METADATA', 'localhost')
+    if 'frr_mgmt_framework_config' in device_metadata:
+        return device_metadata['frr_mgmt_framework_config']
+    return DEFAULT_FRR_MGMT_FRAMEWORK_CONFIG
 
 def interface_is_in_vlan(vlan_member_table, interface_name):
     """ Check if an interface is in a vlan """
@@ -4715,6 +4733,41 @@ def bgp_neighbor_remove(neighbor_ip_or_hostname):
 
     if not removed_neighbor:
         click.get_current_context().fail("Could not locate neighbor '{}'".format(neighbor_ip_or_hostname))
+
+#
+# 'config-mode' subgroup ('config bgp config-mode ...')
+#
+
+@bgp.group(cls=clicommon.AbbreviationGroup, name='frr_mgmt_framework_config')
+def bgp_frr_framework_config_mode():
+    "BGP  frr_framework_config_mode commands."
+    pass
+
+
+@bgp_frr_framework_config_mode.command(
+    'set',
+    short_help="Set the BGP bgp_frr_framework_config_mode.",
+    help=f"""
+    Set the BGP bgp_frr_framework_config_mode.
+    Available modes: {', '.join(FRR_MGMT_FRAMEWORK_CONFIG_VALUES)}.
+    """
+)
+@click.argument('mode', metavar='<mode>', required=True, type=click.Choice(FRR_MGMT_FRAMEWORK_CONFIG_VALUES))
+def bgp_config_mode_set(mode):
+    """Set the BGP bgp_frr_framework_config_mode."""
+    config_db = ConfigDBConnector(use_unix_socket_path=True)
+    config_db.connect()
+    _set_frr_mgmt_framework_config(config_db, mode)
+
+
+@bgp_frr_framework_config_mode.command('get')
+def bgp_config_mode_get():
+    """Get the BGP bgp_frr_framework_config_mode."""
+    config_db = ConfigDBConnector(use_unix_socket_path=True)
+    config_db.connect()
+
+    click.echo(f"Current BGP bgp_frr_framework_config_mode: {_get_frr_mgmt_framework_config(config_db)}")
+
 
 @bgp.group(cls=clicommon.AbbreviationGroup, name='network')
 def bgp_network():

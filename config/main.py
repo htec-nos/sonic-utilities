@@ -4717,20 +4717,14 @@ def bgp_network_add(prefix):
     current_data = config_db.get_table(table)
 
     # If table does not exist or is empty, initialize it
-    if current_data is None or len(current_data) == 0:
-        click.echo(f"Table {table} not found. Creating new one...")
-        # mod_entry ensures table is created
-        config_db.mod_entry(table, key, {})
-    else:
-        # If entry already exists, warn the user
-        if config_db.get_entry(table, key):
-            click.echo(f"Network {prefix} already exists in {table}.")
-            return
+    if tuple(key.split("|")) in current_data.keys():
+        click.echo(f"Network {prefix} already exists in {table}.")
+        return
 
     # Otherwise, create new entry
     config_db.set_entry(table, key, {})
 
-    click.echo(f"Added BGP network {prefix} to {table}.")
+    click.secho(f"Added BGP network {prefix} to {table}.", fg="green")
 
 #
 # 'interface' group ('config interface ...')

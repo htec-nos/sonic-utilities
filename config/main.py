@@ -4670,7 +4670,7 @@ def neighbor(ipaddr_or_hostname, verbose):
 
 @bgp.group(cls=clicommon.AbbreviationGroup, name='neighbor')
 def bgp_neighbor():
-    "Remove BGP neighbor configuration from the device"
+    "BGP neighbor configuration commands."
     pass
 
 @bgp_neighbor.command('remove')

@@ -4668,14 +4668,14 @@ def neighbor(ipaddr_or_hostname, verbose):
 # 'remove' subgroup ('config bgp remove ...')
 #
 
-@bgp.group(cls=clicommon.AbbreviationGroup)
-def remove():
-    "Remove BGP neighbor configuration from the device"
+@bgp.group(cls=clicommon.AbbreviationGroup, name='neighbor')
+def bgp_neighbor():
+    "BGP neighbor configuration commands."
     pass
 
-@remove.command('neighbor')
+@bgp_neighbor.command('remove')
 @click.argument('neighbor_ip_or_hostname', metavar='<neighbor_ip_or_hostname>', required=True)
-def remove_neighbor(neighbor_ip_or_hostname):
+def bgp_neighbor_remove(neighbor_ip_or_hostname):
     """Deletes BGP neighbor configuration of given hostname or ip from devices
        User can specify either internal or external BGP neighbor to remove
     """

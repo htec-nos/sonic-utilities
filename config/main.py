@@ -4676,7 +4676,7 @@ def bgp_neighbor():
 @bgp_neighbor.command('add')
 @click.argument("ip_addr", metavar="<ip_addr>", required=True)
 @click.argument('remote-as', metavar="<remote-as>", required=True, type=int)
-@click.argument('description', metavar="<neighbor_description", required=False)
+@click.argument('description', metavar="<neighbor_description>", required=False)
 def bgp_neighbor_add(ip_addr, remote_as, description):
     """
     Add neighbor with IP address and remote AS.

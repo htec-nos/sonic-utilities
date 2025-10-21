@@ -4697,6 +4697,41 @@ def remove_neighbor(neighbor_ip_or_hostname):
     if not removed_neighbor:
         click.get_current_context().fail("Could not locate neighbor '{}'".format(neighbor_ip_or_hostname))
 
+@bgp.group(cls=clicommon.AbbreviationGroup, name='network')
+def bgp_network():
+    """Configure BGP network advertisements"""
+    pass
+
+@bgp_network.command('add')
+@click.argument("prefix", metavar="<prefix>", required=True, callback=validate_ipv4_address)
+def bgp_network_add(prefix):
+    """Add a network prefix to BGP_GLOBALS_AF_NETWORK"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    table = "BGP_GLOBALS_AF_NETWORK"
+    key = f"default|ipv4_unicast|{prefix}"
+
+    # Read current data from ConfigDB
+    current_data = config_db.get_table(table)
+
+    # If table does not exist or is empty, initialize it
+    if current_data is None or len(current_data) == 0:
+        click.echo(f"Table {table} not found. Creating new one...")
+        # mod_entry ensures table is created
+        config_db.mod_entry(table, key, {})
+    else:
+        # If entry already exists, warn the user
+        if config_db.get_entry(table, key):
+            click.echo(f"Network {prefix} already exists in {table}.")
+            return
+
+    # Otherwise, create new entry
+    config_db.set_entry(table, key, {})
+
+    click.echo(f"Added BGP network {prefix} to {table}.")
+
 #
 # 'interface' group ('config interface ...')
 #

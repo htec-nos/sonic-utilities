@@ -126,6 +126,16 @@ GUID_MAX_LEN = 255
 VALID_ROUTING_CONFIG_MODES = ['separated', 'unified', 'split', 'split-unified']
 DEFAULT_ROUTING_CONFIG_MODE = 'unified'
 
+BGP_CONFIGURATION_CONFIG_DB_TABLES = [
+    "BGP_GLOBALS",
+    "BGP_GLOBALS_AF_NETWORK",
+    "BGP_NEIGHBOR",
+    "BGP_NEIGHBOR_AF",
+    "PREFIX",
+    "PREFIX_SET",
+    "ROUTE_MAP"
+]
+
 asic_type = None
 
 DSCP_RANGE = click.IntRange(min=0, max=63)

@@ -4835,6 +4835,33 @@ def bgp_config_framework_get():
 
     click.echo(f"Current BGP configuration framework: {_get_frr_mgmt_framework_config(config_db)}")
 
+#
+# 'bgp-create' command ('config bgp create ...')
+#
+
+@bgp.command('create')
+@click.argument("asn", metavar="<asn>", required=True,  type=int)
+@click.argument('local_asn', metavar="<local_asn>", required=True, type=int)
+@click.argument('router_id', metavar="<router_id>", required=True, callback=validate_ipv4_address)
+def bgp_create(asn, local_asn, router_id):
+    """Create the global BGP configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    entry ={
+        "asn": asn,
+        "local_asn": local_asn,
+        "router_id": router_id
+    }
+
+    config_db.set_entry("BGP_GLOBALS", "default", entry)
+
+    click.echo(f"Created global BGP configuration with asn: {asn}, local_asn: {local_asn} and router_id: {router_id}")
+
+#
+# 'bgp-network' subgroup ('config bgp network ...')
+#
 
 @bgp.group(cls=clicommon.AbbreviationGroup, name='network')
 def bgp_network():

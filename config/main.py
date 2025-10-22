@@ -4841,23 +4841,26 @@ def bgp_config_framework_get():
 
 @bgp.command('create')
 @click.argument("asn", metavar="<asn>", required=True,  type=int)
-@click.argument('local_asn', metavar="<local_asn>", required=True, type=int)
 @click.argument('router_id', metavar="<router_id>", required=True, callback=validate_ipv4_address)
+@click.argument('local_asn', metavar="<local_asn>", required=False, type=int)
 def bgp_create(asn, local_asn, router_id):
     """Create the global BGP configuration"""
 
     config_db = ConfigDBConnector()
     config_db.connect()
 
-    entry ={
+    # Prepare entry
+    entry = {
         "asn": asn,
-        "local_asn": local_asn,
         "router_id": router_id
     }
 
+    if local_asn:
+        entry["local_asn"] = local_asn
+
     config_db.set_entry("BGP_GLOBALS", "default", entry)
 
-    click.echo(f"Created global BGP configuration with asn: {asn}, local_asn: {local_asn} and router_id: {router_id}")
+    click.echo(f"Created global BGP configuration with ASN: {asn} and Router ID: {router_id}")
 
 #
 # 'bgp-network' subgroup ('config bgp network ...')

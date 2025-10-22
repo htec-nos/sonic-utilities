@@ -4745,6 +4745,29 @@ def bgp_network_add(prefix):
 
     click.secho(f"Added BGP network {prefix} to {table}.", fg="green")
 
+@bgp_network.command('remove')
+@click.argument("prefix", metavar="<prefix>", required=True, callback=validate_ipv4_address)
+def bgp_network_remove(prefix):
+    """Remove a network prefix to BGP_GLOBALS_AF_NETWORK"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    table = "BGP_GLOBALS_AF_NETWORK"
+    key = ("default", "ipv4_unicast", prefix)
+
+    # Read the whole table
+    table_data = config_db.get_table(table) or {}
+
+    # Check if network exists
+    if key not in table_data:
+        click.secho(f"Network {prefix} does not exist in {table}. Nothing to remove.", fg="yellow")
+        return
+
+    # Remove the network
+    config_db.set_entry(table, key, None)
+    click.secho(f"Removed BGP network {prefix} from {table}.", fg="green")
+
 #
 # 'interface' group ('config interface ...')
 #

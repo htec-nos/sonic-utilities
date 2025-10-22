@@ -126,7 +126,7 @@ GUID_MAX_LEN = 255
 VALID_ROUTING_CONFIG_MODES = ['separated', 'unified', 'split', 'split-unified']
 DEFAULT_ROUTING_CONFIG_MODE = 'unified'
 
-BGP_CONFIGURATION_CONFIG_DB_TABLES = [
+BGP_CONFIG_DB_TABLES = [
     "BGP_GLOBALS",
     "BGP_GLOBALS_AF_NETWORK",
     "BGP_NEIGHBOR",
@@ -4898,7 +4898,7 @@ def bgp_remove(force):
             abort=True
         )
 
-    for table in BGP_CONFIGURATION_CONFIG_DB_TABLES:
+    for table in BGP_CONFIG_DB_TABLES:
         entries = config_db.get_table(table)
         for key in list(entries.keys()):
             config_db.set_entry(table, key, None)

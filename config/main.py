@@ -4849,6 +4849,14 @@ def bgp_create(asn, local_asn, router_id):
     config_db = ConfigDBConnector()
     config_db.connect()
 
+    table = "BGP_GLOBALS"
+    key = "default"
+
+    existing = config_db.get_entry(table, key)
+    if existing:
+        click.secho(f"There is already an existing configuration, remove it first!", fg="yellow")
+        return
+
     # Prepare entry
     entry = {
         "asn": asn,
@@ -4858,9 +4866,31 @@ def bgp_create(asn, local_asn, router_id):
     if local_asn:
         entry["local_asn"] = local_asn
 
-    config_db.set_entry("BGP_GLOBALS", "default", entry)
+    config_db.set_entry(table, key, entry)
 
     click.echo(f"Created global BGP configuration with ASN: {asn} and Router ID: {router_id}")
+
+#
+# 'bgp-delete' command ('config bgp delete ...')
+#
+
+@bgp.command('delete')
+def bgp_delete():
+    """Delete the global BGP configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    table = "BGP_GLOBALS"
+    key = "default"
+
+    entry = config_db.get_entry(table, key)
+    if not entry:
+        click.secho(f"No global BGP configuration found in {table}.", fg="yellow")
+        return
+
+    config_db.set_entry(table, key, None)
+    click.echo(f"Deleted BGP global configuration from {table}.")
 
 #
 # 'bgp-network' subgroup ('config bgp network ...')

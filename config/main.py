@@ -117,6 +117,8 @@ DEFAULT_TPID = "0x8100"
 PORT_MODE = "switchport_mode"
 
 DOM_CONFIG_SUPPORTED_SUBPORTS = ['0', '1']
+FRR_MGMT_FRAMEWORK_CONFIG_VALUES = {"bgpcfgd":"false", "frrcfgd":"true"}
+DEFAULT_FRR_MGMT_FRAMEWORK_CONFIG = "bgpcfgd"
 
 VNET_NAME_MAX_LEN = 15
 GUID_MAX_LEN = 255
@@ -1074,6 +1076,35 @@ def _swss_ready():
 def _is_system_starting():
     out, _ = clicommon.run_command(['sudo', 'systemctl', 'is-system-running'], return_cmd=True)
     return out.strip() == "starting"
+
+def _set_frr_mgmt_framework_config(config_db, mode):
+    """Set routing configuration framework in CONFIG_DB"""
+    try:
+        device_metadata = config_db.get_entry('DEVICE_METADATA', 'localhost')
+        current_config = device_metadata.get('frr_mgmt_framework_config')
+        desired_config = FRR_MGMT_FRAMEWORK_CONFIG_VALUES[mode]
+
+        if current_config == desired_config:
+            click.echo(f"BGP configuration framework mode is already set to '{mode}'. No changes made.")
+        else:
+            config_db.mod_entry('DEVICE_METADATA', 'localhost', {'frr_mgmt_framework_config': desired_config})
+            click.echo(f"BGP frr_mgmt_framework_config set to '{mode}' successfully.")
+    except Exception as e:
+        click.echo(f"An error occurred while setting BGP configuration framework: {str(e)}", err=True)
+
+def _get_frr_mgmt_framework_config(config_db):
+    """Get routing configuration framework from CONFIG_DB"""
+    try:
+        device_metadata = config_db.get_entry('DEVICE_METADATA', 'localhost')
+        current_config = device_metadata.get('frr_mgmt_framework_config')
+
+        for key, value in FRR_MGMT_FRAMEWORK_CONFIG_VALUES.items():
+            if value == current_config:
+                return key
+        return DEFAULT_FRR_MGMT_FRAMEWORK_CONFIG
+    except Exception as e:
+        click.echo(f"An error occurred while getting BGP configuration framework: {str(e)}", err=True)
+        return DEFAULT_FRR_MGMT_FRAMEWORK_CONFIG
 
 def interface_is_in_vlan(vlan_member_table, interface_name):
     """ Check if an interface is in a vlan """
@@ -4715,6 +4746,41 @@ def bgp_neighbor_remove(neighbor_ip_or_hostname):
 
     if not removed_neighbor:
         click.get_current_context().fail("Could not locate neighbor '{}'".format(neighbor_ip_or_hostname))
+
+#
+# 'config-framework' subgroup ('config bgp config-framework ...')
+#
+
+@bgp.group(cls=clicommon.AbbreviationGroup, name='config-framework')
+def bgp_config_framework():
+    "BGP config-framework command."
+    pass
+
+
+@bgp_config_framework.command(
+    'set',
+    short_help="Set the BGP configuration framework.",
+    help=f"""
+    Set the BGP bgp_config_framework.
+    Available modes: {', '.join(FRR_MGMT_FRAMEWORK_CONFIG_VALUES.keys())}.
+    """
+)
+@click.argument('mode', metavar='<mode>', required=True, type=click.Choice(FRR_MGMT_FRAMEWORK_CONFIG_VALUES.keys()))
+def bgp_config_framework_set(mode):
+    """Set the BGP configuration framework."""
+    config_db = ConfigDBConnector(use_unix_socket_path=True)
+    config_db.connect()
+    _set_frr_mgmt_framework_config(config_db, mode)
+
+
+@bgp_config_framework.command('get')
+def bgp_config_framework_get():
+    """Get the BGP configuration framework."""
+    config_db = ConfigDBConnector(use_unix_socket_path=True)
+    config_db.connect()
+
+    click.echo(f"Current BGP configuration framework: {_get_frr_mgmt_framework_config(config_db)}")
+
 
 @bgp.group(cls=clicommon.AbbreviationGroup, name='network')
 def bgp_network():

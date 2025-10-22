@@ -4871,26 +4871,29 @@ def bgp_create(asn, local_asn, router_id):
     click.echo(f"Created global BGP configuration with ASN: {asn} and Router ID: {router_id}")
 
 #
-# 'bgp-delete' command ('config bgp delete ...')
+# 'bgp-remove' command ('config bgp remove ...')
 #
 
-@bgp.command('delete')
-def bgp_delete():
-    """Delete the global BGP configuration"""
+@bgp.command('remove')
+@click.option('--force', is_flag=True, help='Skip confirmation prompt')
+def bgp_remove(force):
+    """Remove all BGP configuration"""
 
     config_db = ConfigDBConnector()
     config_db.connect()
 
-    table = "BGP_GLOBALS"
-    key = "default"
+    if not force:
+        click.confirm(
+            "This will delete ALL BGP configuration (global, neighbors, networks, prefix-list). Continue?",
+            abort=True
+        )
 
-    entry = config_db.get_entry(table, key)
-    if not entry:
-        click.secho(f"No global BGP configuration found in {table}.", fg="yellow")
-        return
+    for table in BGP_CONFIGURATION_CONFIG_DB_TABLES:
+        entries = config_db.get_table(table)
+        for key in list(entries.keys()):
+            config_db.set_entry(table, key, None)
 
-    config_db.set_entry(table, key, None)
-    click.echo(f"Deleted BGP global configuration from {table}.")
+    click.echo("All BGP-related configuration deleted from CONFIG_DB.")
 
 #
 # 'bgp-network' subgroup ('config bgp network ...')

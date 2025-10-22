@@ -4737,7 +4737,7 @@ def bgp_network_add(prefix):
 
     # Check if the network prefix already exists
     if tuple(key.split("|")) in current_data.keys():
-        click.echo(f"Network {prefix} already exists in {table}.")
+        click.secho(f"Network {prefix} already exists in {table}.", fg="yellow")
         return
 
     # Otherwise, create new entry

@@ -4714,6 +4714,76 @@ def neighbor(ipaddr_or_hostname, verbose):
     if not found_neighbor:
         click.get_current_context().fail("Could not locate neighbor '{}'".format(ipaddr_or_hostname))
 
+
+@bgp.group(cls=clicommon.AbbreviationGroup, name='route-map', context_settings=dict(max_content_width=120))
+def bgp_route_map():
+    """
+    BGP route map.
+    """
+    pass
+
+@bgp_route_map.command('add')
+@click.argument("prefix-name", metavar="<prefix-name>", required=True)
+@click.argument('route-operation', metavar="<route-operation>", required=True, type=click.Choice(['permit', 'deny']))
+@click.argument('seq-num', metavar="<seq-num'>", required=True, type=int)
+@click.argument('prefix-list', metavar="<prefix-list>", required=True)
+def bgp_route_map_add(prefix_name, route_operation, seq_num, prefix_list):
+    """
+    Add route map for BGP.
+    """
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    # Validate the prefix list exists
+    prefix_set = config_db.get_table("PREFIX_SET")
+    if prefix_list not in prefix_set:
+        raise click.BadParameter(f"Prefix list {prefix_list} does not exist.")
+
+    # Get the current route maps
+    route_map_table = config_db.get_table("ROUTE_MAP")
+
+    # Create the route map key
+    route_map_key = f"{prefix_name}|{seq_num}"
+
+    # Check if the route map already exists
+    if route_map_key in route_map_table:
+        raise click.UsageError(f"Route map {route_map_key} already exists.")
+
+    # Add the route map
+    entry = {
+        "route_operation": route_operation,
+        "match_prefix_set": prefix_list
+    }
+    config_db.set_entry("ROUTE_MAP", route_map_key, entry)
+
+    click.secho(f"Route map {route_map_key} added successfully.", fg="green")
+
+
+@bgp_route_map.command('remove')
+@click.argument("prefix-name", metavar="<prefix-name>", required=True)
+@click.argument('seq-num', metavar="<seq-num>", required=True, type=int)
+def bgp_route_map_remove(prefix_name, seq_num):
+    """
+    Remove route map for BGP.
+    """
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    # Get the current route maps
+    route_map_table = config_db.get_table("ROUTE_MAP")
+
+    # Create the route map key
+    route_map_key = f"{prefix_name}|{seq_num}"
+
+    # Check if the route map exists
+    if route_map_key not in route_map_table:
+        raise click.UsageError(f"Route map {route_map_key} does not exist.")
+
+    # Remove the route map
+    config_db.set_entry("ROUTE_MAP", route_map_key, None)
+
+    click.secho(f"Route map {route_map_key} removed successfully.", fg="green")
+
 #
 # 'remove' subgroup ('config bgp remove ...')
 #

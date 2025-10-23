@@ -126,6 +126,17 @@ GUID_MAX_LEN = 255
 VALID_ROUTING_CONFIG_MODES = ['separated', 'unified', 'split', 'split-unified']
 DEFAULT_ROUTING_CONFIG_MODE = 'unified'
 
+BGP_VALID_PREFIX_ACTIONS = ["permit", "deny"]
+BGP_CONFIG_DB_TABLES = [
+    "BGP_GLOBALS",
+    "BGP_GLOBALS_AF_NETWORK",
+    "BGP_NEIGHBOR",
+    "BGP_NEIGHBOR_AF",
+    "PREFIX",
+    "PREFIX_SET",
+    "ROUTE_MAP"
+]
+
 asic_type = None
 
 DSCP_RANGE = click.IntRange(min=0, max=63)
@@ -1327,6 +1338,24 @@ def remove_router_interface_ip_address(config_db, interface_name, ipaddress_to_r
 
         if ipaddress.ip_interface(ipaddress_string) == ipaddress_to_remove:
             config_db.set_entry(table_name, (interface_name, ipaddress_string), None)
+
+def validate_prefix_len(ctx, param, value):
+    """Validate len format like '8..24' or '16..32'."""
+    if value is None:
+        return None
+    if not re.fullmatch(r"\d{1,2}\.\.\d{1,2}", value):
+        raise click.BadParameter("Length must match pattern '<num>..<num>' (e.g., '8..24')")
+    return value
+
+def validate_ip_address(ctx, param, value):
+    """Validate IP address format."""
+    try:
+        ip_n = ipaddress.ip_network(value, False)
+        if ip_n.version != 4 and ip_n.version != 6:
+            raise click.BadParameter("{} is not a valid IPv4 or IPv6 address".format(value))
+        return value
+    except ValueError as e:
+        raise click.BadParameter(str(e))
 
 def validate_ipv4_address(ctx, param, ip_addr):
     """Helper function to validate ipv4 address
@@ -4927,6 +4956,73 @@ def bgp_config_framework_get():
 
     click.echo(f"Current BGP configuration framework: {_get_frr_mgmt_framework_config(config_db)}")
 
+#
+# 'bgp-create' command ('config bgp create ...')
+#
+
+@bgp.command('create')
+@click.argument("asn", metavar="<asn>", required=True,  type=int)
+@click.argument('router_id', metavar="<router_id>", required=True, callback=validate_ipv4_address)
+@click.argument('local_asn', metavar="<local_asn>", required=False, type=int)
+def bgp_create(asn, local_asn, router_id):
+    """Create the global BGP configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    table = "BGP_GLOBALS"
+    key = "default"
+
+    existing = config_db.get_entry(table, key)
+    if existing:
+        click.secho(f"There is already an existing configuration, remove it first!", fg="yellow")
+        return
+
+    # Prepare entry
+    entry = {
+        "asn": asn,
+        "router_id": router_id
+    }
+
+    if local_asn:
+        entry["local_asn"] = local_asn
+
+    config_db.set_entry(table, key, entry)
+
+    click.echo(f"Created global BGP configuration with ASN: {asn} and Router ID: {router_id}")
+
+#
+# 'bgp-remove' command ('config bgp remove ...')
+#
+
+@bgp.command('remove')
+@click.option('--force', is_flag=True, help='Skip confirmation prompt')
+def bgp_remove(force):
+    """Remove all BGP configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    if not force:
+        click.confirm(
+            "This will delete ALL BGP configuration (global, neighbors, networks, prefix-list). Continue?",
+            abort=True
+        )
+
+    for table in BGP_CONFIG_DB_TABLES:
+        entries = config_db.get_table(table)
+        for key in list(entries.keys()):
+            config_db.set_entry(table, key, None)
+
+    click.echo("All BGP-related configuration deleted from CONFIG_DB.")
+
+#
+# 'bgp-network' subgroup ('config bgp network ...')
+#
+
+#
+# 'network' subgroup ('config bgp network ...')
+#
 
 @bgp.group(cls=clicommon.AbbreviationGroup, name='network')
 def bgp_network():
@@ -4979,6 +5075,136 @@ def bgp_network_remove(prefix):
     # Remove the network
     config_db.set_entry(table, key, None)
     click.secho(f"Removed BGP network {prefix} from {table}.", fg="green")
+
+#
+# 'prefix' subgroup ('config bgp prefix ...')
+#
+
+@bgp.group(cls=clicommon.AbbreviationGroup, name='prefix')
+def bgp_prefix():
+    """Configure BGP prefix filtering mechanism"""
+    pass
+
+@bgp_prefix.command(
+    'add',
+    short_help="Add a BGP prefix.",
+    help=f"""
+    Add a BGP prefix for filtering. Equivalent vytsh FRR command:
+
+    ip prefix-list NAME (permit|deny) PREFIX [le LEN] [ge LEN]
+
+    In this CLI, <len> is specified as '<le>..<ge>'. If empty, the exact prefix
+    length is matched.
+    """
+)
+@click.argument("prefix_name", metavar="<name>", required=True, type=str)
+@click.argument("action", metavar="<action>", required=True, type=click.Choice(BGP_VALID_PREFIX_ACTIONS))
+@click.argument("prefix_ip", metavar="<prefix_ip>", required=True, callback=validate_ip_address)
+@click.argument("prefix_len", metavar="<len>", required=False, callback=validate_prefix_len)
+def bgp_prefix_add(prefix_name, action, prefix_ip, prefix_len):
+    """Add a BGP prefix list"""
+
+    # Set default prefix length if not specified
+    prefix_len = prefix_len or "exact"
+    
+    # Validate IP address and determine address family
+    network = ipaddress.ip_network(prefix_ip, strict=False)
+    mode = "ipv4" if network.version == 4 else "ipv6"
+
+    # Validate length is within acceptable range
+    if prefix_len != "exact":
+        min_len, max_len = map(int, prefix_len.split(".."))
+
+        max_bits = 32 if network.version == 4 else 128
+        ipver = "IPv4" if network.version == 4 else "IPv6"
+
+        if not (0 <= min_len <= max_bits):
+            raise click.BadParameter(f"Wrong <le> value, it must be between 0 and {max_bits} for {ipver}.")
+        if not (0 <= max_len <= max_bits):
+            raise click.BadParameter(f"Wrong <ge> value, it must be between 0 and {max_bits} for {ipver}.")
+        if min_len > max_len:
+            raise click.BadParameter("Wrong <le> and <ge> values, <le> must be less than or equal to <ge>.")
+        if min_len < network.prefixlen:
+            raise click.BadParameter(f"Wrong <le> value, <le> must be greater than or equal to the {ipver} prefix length.")
+
+    # Connect to ConfigDB
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    prefix_set = config_db.get_table("PREFIX_SET")
+
+    # Check for conflicting definitions
+    existing = prefix_set.get(prefix_name)
+    if existing and existing.get("mode") != mode:
+        raise click.UsageError(
+            f"Prefix {prefix_name} is already defined with mode '{existing.get('mode')}', not '{mode}'.\n"
+            "Delete the existing prefix set before adding a new one with a different mode."
+        )
+
+    entry = {"mode": mode}
+    config_db.set_entry("PREFIX_SET", prefix_name, entry)
+
+    key = f"{prefix_name}|{prefix_ip}|{prefix_len}"
+    current_prefix = config_db.get_table("PREFIX")
+
+    # Check if the network prefix already exists
+    if tuple(key.split("|")) in current_prefix.keys():
+        click.secho(f"Prefix {key} already exists. Remove it before adding a new one.", fg="yellow")
+        return
+
+    entry = {"action": action}
+    config_db.set_entry("PREFIX", key, entry)
+
+
+@bgp_prefix.command(
+    'remove',
+    short_help="Remove an existing BGP prefix.",
+    help=f"""
+    Remove a BGP prefix from filtering. Equivalent vytsh FRR command:
+
+    no ip prefix-list NAME
+
+    CAUTION: if no <prefix_ip> and <len> are provided, the entire prefix list
+    named <name> will be removed.
+    """
+)
+@click.argument("prefix_name", metavar="<name>", required=True, type=str)
+@click.argument("prefix_ip", metavar="<prefix_ip>", required=False)
+@click.argument("prefix_len", metavar="<len>", required=False)
+def bgp_prefix_remove(prefix_name, prefix_ip, prefix_len):
+    """Remove an existing BGP prefix list"""
+
+    # Connect to ConfigDB
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    prefix_set = config_db.get_table("PREFIX_SET")
+    current_prefix = config_db.get_table("PREFIX")
+
+    # Delete prefix set if it exists
+    if not prefix_ip and not prefix_len:
+        existing = prefix_set.get(prefix_name)
+        if not existing:
+            click.secho(f"Prefix set {prefix_name} does not exist.", fg="yellow")
+            return
+        config_db.set_entry("PREFIX_SET", prefix_name, None)
+
+        for key in list(current_prefix.keys()):
+            if key[0] == prefix_name:
+                config_db.set_entry("PREFIX", "|".join(key), None)
+
+        click.secho(f"Entire prefix set {prefix_name} removed successfully.", fg="green")
+        return
+
+    prefix_len = prefix_len or "exact"
+    key = f"{prefix_name}|{prefix_ip}|{prefix_len}"
+    # Check if the network prefix already exists
+    if tuple(key.split("|")) not in current_prefix.keys():
+        click.secho(f"Prefix {key} does not exist.", fg="yellow")
+        return
+
+    config_db.set_entry("PREFIX", key, None)
+    click.secho(f"Prefix {key} removed successfully.", fg="green")
 
 #
 # 'interface' group ('config interface ...')

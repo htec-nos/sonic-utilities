@@ -126,6 +126,16 @@ GUID_MAX_LEN = 255
 VALID_ROUTING_CONFIG_MODES = ['separated', 'unified', 'split', 'split-unified']
 DEFAULT_ROUTING_CONFIG_MODE = 'unified'
 
+BGP_CONFIG_DB_TABLES = [
+    "BGP_GLOBALS",
+    "BGP_GLOBALS_AF_NETWORK",
+    "BGP_NEIGHBOR",
+    "BGP_NEIGHBOR_AF",
+    "PREFIX",
+    "PREFIX_SET",
+    "ROUTE_MAP"
+]
+
 asic_type = None
 
 DSCP_RANGE = click.IntRange(min=0, max=63)
@@ -4835,6 +4845,69 @@ def bgp_config_framework_get():
 
     click.echo(f"Current BGP configuration framework: {_get_frr_mgmt_framework_config(config_db)}")
 
+#
+# 'bgp-create' command ('config bgp create ...')
+#
+
+@bgp.command('create')
+@click.argument("asn", metavar="<asn>", required=True,  type=int)
+@click.argument('router_id', metavar="<router_id>", required=True, callback=validate_ipv4_address)
+@click.argument('local_asn', metavar="<local_asn>", required=False, type=int)
+def bgp_create(asn, local_asn, router_id):
+    """Create the global BGP configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    table = "BGP_GLOBALS"
+    key = "default"
+
+    existing = config_db.get_entry(table, key)
+    if existing:
+        click.secho(f"There is already an existing configuration, remove it first!", fg="yellow")
+        return
+
+    # Prepare entry
+    entry = {
+        "asn": asn,
+        "router_id": router_id
+    }
+
+    if local_asn:
+        entry["local_asn"] = local_asn
+
+    config_db.set_entry(table, key, entry)
+
+    click.echo(f"Created global BGP configuration with ASN: {asn} and Router ID: {router_id}")
+
+#
+# 'bgp-remove' command ('config bgp remove ...')
+#
+
+@bgp.command('remove')
+@click.option('--force', is_flag=True, help='Skip confirmation prompt')
+def bgp_remove(force):
+    """Remove all BGP configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    if not force:
+        click.confirm(
+            "This will delete ALL BGP configuration (global, neighbors, networks, prefix-list). Continue?",
+            abort=True
+        )
+
+    for table in BGP_CONFIG_DB_TABLES:
+        entries = config_db.get_table(table)
+        for key in list(entries.keys()):
+            config_db.set_entry(table, key, None)
+
+    click.echo("All BGP-related configuration deleted from CONFIG_DB.")
+
+#
+# 'bgp-network' subgroup ('config bgp network ...')
+#
 
 @bgp.group(cls=clicommon.AbbreviationGroup, name='network')
 def bgp_network():

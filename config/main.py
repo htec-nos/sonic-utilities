@@ -4866,6 +4866,98 @@ def bgp_neighbor_remove(neighbor_ip_or_hostname):
         click.get_current_context().fail("Could not locate neighbor '{}'".format(neighbor_ip_or_hostname))
 
 #
+# 'address-family' subgroup of neighbor group ('config bgp neighbor address-family ...')
+#
+
+@bgp_neighbor.group(name='address-family')
+def bgp_neighbor_af():
+    """BGP neighbor address-family configuration commands."""
+    pass
+
+@bgp_neighbor_af.command('add')
+@click.argument('afi_safi', metavar='<afi_safi>', required=True)
+@click.argument('neighbor_ip', metavar='<neighbor_ip>', required=True)
+@click.argument('route_map_out', metavar='<route_map_out>', required=True)
+@click.argument('route_map_in', metavar='<route_map_in>', required=True)
+@click.argument('admin_status', metavar='<admin_status>', type=click.Choice(['true', 'false']), required=True)
+@click.argument('nhself', metavar='<nhself>', type=click.Choice(['true', 'false']), required=True)
+@click.argument('rrclient', metavar='<rrclient>', type=click.Choice(['true', 'false']), required=True)
+def bgp_neighbor_af_add(neighbor_ip, afi_safi, route_map_in, route_map_out, admin_status, nhself, rrclient):
+    """Add a BGP neighbor address-family configuration.
+
+    Example:
+      sudo config bgp neighbor address-family add ipv4 1.1.1.1 LEAF1_OUT,LEAF2_OUT LEAF1_IN,LEAF2_IN true false true
+    """
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    # Normalize afi_safi name
+    afi_safi = afi_safi.lower()
+    if afi_safi == "ipv4":
+        afi_safi = "ipv4_unicast"
+    elif afi_safi == "ipv6":
+        afi_safi = "ipv6_unicast"
+
+    # Parse comma-separated route maps into lists
+    route_map_out_list = [x.strip() for x in route_map_out.split(',') if x.strip()]
+    route_map_in_list = [x.strip() for x in route_map_in.split(',') if x.strip()]
+
+    table = "BGP_NEIGHBOR_AF"
+    key = f"default|{neighbor_ip}|{afi_safi}"
+
+    # Check if entry already exists
+    if config_db.get_entry(table, key):
+        click.secho(f"Neighbor AF {neighbor_ip} already exists.", fg="yellow")
+        return
+    
+    # Build entry
+    entry = {
+        "route_map_in": route_map_in_list,
+        "route_map_out": route_map_out_list,
+        "admin_status": admin_status,
+        "nhself": nhself,
+        "rrclient": rrclient
+    }
+
+    # Write to DB
+    config_db.set_entry(table, key, entry)
+    click.secho(f"Added BGP neighbor AF {neighbor_ip} {afi_safi} with settings: {entry}", fg="green")
+
+@bgp_neighbor_af.command('remove')
+@click.argument('afi_safi', metavar='<afi_safi>', required=True)
+@click.argument('neighbor_ip', metavar='<neighbor_ip>', required=True)
+def bgp_neighbor_af_remove(afi_safi, neighbor_ip):
+    """Remove a BGP neighbor address-family configuration.
+
+    Example:
+      sudo config bgp neighbor address-family remove ipv4 1.1.1.1
+    """
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+
+    # Normalize afi_safi naming
+    afi_safi = afi_safi.lower()
+    if afi_safi == "ipv4":
+        afi_safi = "ipv4_unicast"
+    elif afi_safi == "ipv6":
+        afi_safi = "ipv6_unicast"
+
+    table = "BGP_NEIGHBOR_AF"
+    key = f"default|{neighbor_ip}|{afi_safi}"
+
+    # Check if entry exists
+    entry = config_db.get_entry(table, key)
+    if not entry:
+        click.secho(f"Neighbor {neighbor_ip} with AFI {afi_safi} not found in {table}.", fg="yellow")
+        return
+
+    # Remove entry
+    config_db.set_entry(table, key, None)
+    click.secho(f"Removed neighbor {neighbor_ip} ({afi_safi}) from {table}.", fg="green")
+
+#
 # 'config-mode' subgroup ('config bgp config-mode ...')
 #
 

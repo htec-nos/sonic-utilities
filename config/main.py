@@ -4834,7 +4834,7 @@ def bgp_neighbor_af_add(neighbor_ip, afi_safi, route_map_in, route_map_out, admi
     route_map_in_list = [x.strip() for x in route_map_in.split(',') if x.strip()]
 
     table = "BGP_NEIGHBOR_AF"
-    key = f"default|{afi_safi}|{neighbor_ip}"
+    key = f"default|{neighbor_ip}|{afi_safi}"
 
     # Check if entry already exists
     if config_db.get_entry(table, key):
@@ -4875,12 +4875,12 @@ def bgp_neighbor_af_remove(afi_safi, neighbor_ip):
         afi_safi = "ipv6_unicast"
 
     table = "BGP_NEIGHBOR_AF"
-    key = f"default|{afi_safi}|{neighbor_ip}"
+    key = f"default|{neighbor_ip}|{neighbafi_safior_ip}"
 
     # Check if entry exists
     entry = config_db.get_entry(table, key)
     if not entry:
-        click.secho(f"Neighbor {neighbor_ip} with AFI {afi_safi} not found in {table}.", fg="red")
+        click.secho(f"Neighbor {neighbor_ip} with AFI {afi_safi} not found in {table}.", fg="yellow")
         return
 
     # Remove entry

@@ -4875,7 +4875,7 @@ def bgp_neighbor_af_remove(afi_safi, neighbor_ip):
         afi_safi = "ipv6_unicast"
 
     table = "BGP_NEIGHBOR_AF"
-    key = f"default|{neighbor_ip}|{neighbafi_safior_ip}"
+    key = f"default|{neighbor_ip}|{afi_safi}"
 
     # Check if entry exists
     entry = config_db.get_entry(table, key)

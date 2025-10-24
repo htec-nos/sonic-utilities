@@ -4852,7 +4852,7 @@ def bgp_neighbor_af_add(neighbor_ip, afi_safi, route_map_in, route_map_out, admi
 
     # Write to DB
     config_db.set_entry(table, key, entry)
-    click.secho(f"Added BGP neighbor AF {neighbor} {afi_safi} with settings: {entry}", fg="green")
+    click.secho(f"Added BGP neighbor AF {neighbor_ip} {afi_safi} with settings: {entry}", fg="green")
 
 @bgp_neighbor_af.command('remove')
 @click.argument('afi_safi', metavar='<afi_safi>', required=True)
